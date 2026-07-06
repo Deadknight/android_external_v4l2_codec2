@@ -7,6 +7,8 @@
 
 #include <v4l2_codec2/components/V4L2Encoder.h>
 
+#include <errno.h>
+#include <string.h>
 #include <stdint.h>
 #include <optional>
 #include <vector>
@@ -187,7 +189,19 @@ bool V4L2Encoder::setFramerate(uint32_t framerate) {
     parms.parm.output.timeperframe.numerator = 1;
     parms.parm.output.timeperframe.denominator = framerate;
     if (mDevice->ioctl(VIDIOC_S_PARM, &parms) != 0) {
-        ALOGE("Setting framerate to %u failed", framerate);
+        const int savedErrno = errno;
+        if (savedErrno == EINVAL || savedErrno == ENOTTY) {
+            // Some Raspberry Pi V4L2 M2M encoder drivers do not implement
+            // VIDIOC_S_PARM for VIDEO_OUTPUT_MPLANE. Frame cadence is still
+            // carried by C2 work timestamps, so treating an unsupported ioctl
+            // as a fatal component error prevents otherwise valid surface-input
+            // encoding from ever producing the first NAL.
+            ALOGW("VIDIOC_S_PARM unsupported for framerate=%u: errno=%d (%s); continuing",
+                  framerate, savedErrno, strerror(savedErrno));
+            return true;
+        }
+        ALOGE("Setting framerate to %u failed: errno=%d (%s)", framerate, savedErrno,
+              strerror(savedErrno));
         return false;
     }
     return true;
