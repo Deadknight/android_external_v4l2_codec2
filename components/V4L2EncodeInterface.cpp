@@ -389,10 +389,13 @@ void V4L2EncodeInterface::Initialize(const C2String& name) {
     // will be performed between the guest and host buffer to keep them in sync. This is wasteful as
     // the buffer is only used on guest side by the format convertor which converts and copies the
     // buffer into another buffer.
-    //addParameter(DefineParam(mInputMemoryUsage, C2_PARAMKEY_INPUT_STREAM_USAGE)
-    //                     .withConstValue(new C2StreamUsageTuning::input(
-    //                             0u, static_cast<uint64_t>(BufferUsage::VIDEO_ENCODER)))
-    //                     .build());
+    // ARDA_H264_FULL_DMABUF_PRODUCTION_V1:
+    // Direct DMA-BUF is primary. CPU_READ preserves AOSP's mappable fallback
+    // if the hardware-import fast path cannot be used.
+    addParameter(DefineParam(mInputMemoryUsage, C2_PARAMKEY_INPUT_STREAM_USAGE)
+                         .withConstValue(new C2StreamUsageTuning::input(
+                                 0u, static_cast<uint64_t>(C2MemoryUsage::CPU_READ)))
+                         .build());
 
     addParameter(
             DefineParam(mOutputFormat, C2_PARAMKEY_OUTPUT_STREAM_BUFFER_TYPE)
